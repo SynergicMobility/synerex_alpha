@@ -5,13 +5,15 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
+	"net/http"
 	"sync"
 
 	pb "github.com/synerex/synerex_alpha/api"
 	smutil "github.com/synerex/synerex_alpha/sxutil"
+	"golang.org/x/net/websocket"
 	"google.golang.org/grpc"
-	"fmt"
 )
 
 var (
@@ -51,6 +53,51 @@ func addDemand(sclient *smutil.SMServiceClient, nm string) {
 	dmMap[id] = opts
 }
 
+type message struct {
+	// the json tag means this will serialize as a lowercased field
+	Message string `json:"message"`
+}
+
+func HandleClient(sclient *smutil.SMServiceClient) {
+
+	ClientHandler := func(ws *websocket.Conn) {
+		for {
+			// allocate our container struct
+			var m message
+
+			// receive a message using the codec
+			if err := websocket.JSON.Receive(ws, &m); err != nil {
+				log.Println(err)
+				break
+			}
+
+			log.Println("Received message:", m.Message)
+
+			addDemand(sclient, "Advertise video for 30s woman")
+
+			// send a response
+			m2 := message{"Thanks for the message!"}
+			if err := websocket.JSON.Send(ws, m2); err != nil {
+				log.Println(err)
+				break
+			}
+		}
+	}
+
+	// http.Handle("/", websocket.Handler(ClientHandler))
+	// Allow Cross-Domain
+	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		s := websocket.Server{Handler: websocket.Handler(ClientHandler)}
+		s.ServeHTTP(w, req)
+	})
+
+	err := http.ListenAndServe(":5001", nil)
+	if err != nil {
+		log.Fatalf("ListenAndServe: " + err.Error())
+		return
+	}
+}
+
 func main() {
 	flag.Parse()
 	smutil.RegisterNodeName(*nodesrv, "AdProvider", false)
@@ -75,7 +122,12 @@ func main() {
 
 	wg.Add(1)
 	go subscribeSupply(sclient)
-	addDemand(sclient, "Advertise video for 30s woman")
+
+	// addDemand(sclient, "Advertise video for 30s woman")
+
+	wg.Add(1)
+	go HandleClient(sclient)
+
 	wg.Wait()
 
 	smutil.CallDeferFunctions() // cleanup!
