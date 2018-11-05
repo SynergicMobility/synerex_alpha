@@ -21,6 +21,9 @@ var (
 	nodesrv    = flag.String("nodesrv", "127.0.0.1:9990", "Node ID Server")
 	idlist     []uint64
 	dmMap      map[uint64]*smutil.DemandOpts
+	// need to refactor
+	ws_conn *websocket.Conn
+	pb_sp   *pb.Supply
 )
 
 func init() {
@@ -34,8 +37,14 @@ func supplyCallback(clt *smutil.SMServiceClient, sp *pb.Supply) {
 	log.Println("Got ad supply callback")
 	// choice is supply for me? or not.
 	if clt.IsSupplyTarget(sp, idlist) { //
+		pb_sp = sp
 		// always select Supply
-		clt.SelectSupply(sp)
+		// clt.SelectSupply(sp)
+
+		// message to client
+		m := message{}
+		m.Message = "Supply from ..."
+		websocket.JSON.Send(ws_conn, m)
 	}
 }
 
@@ -56,12 +65,16 @@ func addDemand(sclient *smutil.SMServiceClient, nm string) {
 type message struct {
 	// the json tag means this will serialize as a lowercased field
 	Message string `json:"message"`
+	Command string `json:"command"`
+	Demand  string `json:"demand"`
+	Url     string `json:"url"`
 }
 
 func HandleClient(sclient *smutil.SMServiceClient) {
 
 	ClientHandler := func(ws *websocket.Conn) {
 		for {
+			ws_conn = ws
 			// allocate our container struct
 			var m message
 
@@ -73,10 +86,16 @@ func HandleClient(sclient *smutil.SMServiceClient) {
 
 			log.Println("Received message:", m.Message)
 
-			addDemand(sclient, "Advertise video for 30s woman")
+			switch m.Command {
+			case "Demand":
+				addDemand(sclient, m.Demand)
+			case "Select":
+				sclient.SelectSupply(pb_sp)
+			}
 
 			// send a response
-			m2 := message{"Thanks for the message!"}
+			m2 := message{}
+			m2.Message = "Thanks for the message!"
 			if err := websocket.JSON.Send(ws, m2); err != nil {
 				log.Println(err)
 				break

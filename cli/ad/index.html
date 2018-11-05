@@ -8,7 +8,22 @@
 </head>
 <body>
 
-    <input type="button" id="sample" value="送信">
+    <form>
+
+      <div>
+        需要：<input type="text" name="demand" id="demand">
+      </div>
+      <div>
+        URL：<input type="text" name="url" id="url">
+      </div>
+      <input type="button" id="demand-btn" value="需要">
+
+      <hr>
+      <div id="select-console">
+      </div>
+      <input type="button" id="select-btn" value="選択">
+    </form>
+
 
     <script>
         var sock = new WebSocket('ws://127.0.0.1:5001');
@@ -26,11 +41,25 @@
         window.addEventListener('DOMContentLoaded',function(e){
             // サーバーにデータを送る
             var data = {};
-            data.Message = "Advertise video for 30s woman";
-            document.getElementById('sample').addEventListener('click',function(e){
+            data.Message = "Message from Client";
+            data.Command = "Demand";
+            data.Demand = document.getElementById("demand").value;
+            data.Url = document.getElementById("url").value;
+            document.getElementById('demand-btn').addEventListener('click',function(e){
                 sock.send(JSON.stringify(data));
             });
         });
+
+        window.addEventListener('DOMContentLoaded',function(e){
+            // サーバーにデータを送る
+            var data = {};
+            data.Message = "Message from Client";
+            data.Command = "Select";
+            document.getElementById('select-btn').addEventListener('click',function(e){
+                sock.send(JSON.stringify(data));
+            });
+        });
+
     </script>
 </body>
 </html>
