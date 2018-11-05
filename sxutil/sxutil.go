@@ -10,19 +10,19 @@ import (
 	"io"
 	"log"
 	"time"
-	"google.golang.org/grpc"
+
 	"github.com/bwmarrin/snowflake"
 	"github.com/golang/protobuf/ptypes"
+	"google.golang.org/grpc"
 
 	"github.com/synerex/synerex_alpha/api"
 	"github.com/synerex/synerex_alpha/api/fleet"
+	"github.com/synerex/synerex_alpha/api/ptransit"
 	"github.com/synerex/synerex_alpha/nodeapi"
-
-	)
+)
 
 // IDType for all ID in Synergic Market
 type IDType uint64
-
 
 var (
 	node       *snowflake.Node // package variable for keeping unique ID.
@@ -42,11 +42,12 @@ type DemandOpts struct {
 
 // SupplyOpts is sender options for Supply
 type SupplyOpts struct {
-	ID     uint64
-	Target uint64
-	Name   string
-	JSON   string
-	Fleet 	*fleet.Fleet
+	ID        uint64
+	Target    uint64
+	Name      string
+	JSON      string
+	Fleet     *fleet.Fleet
+	PTService *ptransit.PTService
 }
 
 func init() {
@@ -65,10 +66,10 @@ func InitNodeNum(n int) {
 	}
 }
 
-func GetNodeName(n int) string{
-	ni,err :=	clt.QueryNode(context.Background(), &nodeapi.NodeID{NodeId: int32(n)})
-	if err != nil{
-		log.Printf("Error on QueryNode %v",err)
+func GetNodeName(n int) string {
+	ni, err := clt.QueryNode(context.Background(), &nodeapi.NodeID{NodeId: int32(n)})
+	if err != nil {
+		log.Printf("Error on QueryNode %v", err)
 	}
 	return ni.NodeName
 }
@@ -165,11 +166,9 @@ func (clt *SMServiceClient) IsDemandTarget(dm *api.Demand, idlist []uint64) bool
 	return false
 }
 
-
-
 // ProposeSupply send proposal Supply message to server
-func (clt *SMServiceClient) ProposeSupply(spo *SupplyOpts) uint64{
-	pid :=GenerateIntID()
+func (clt *SMServiceClient) ProposeSupply(spo *SupplyOpts) uint64 {
+	pid := GenerateIntID()
 	sp := &api.Supply{
 		Id:         pid,
 		SenderId:   uint64(clt.ClientID),
@@ -221,8 +220,6 @@ func (clt *SMServiceClient) SelectDemand(dm *api.Demand) {
 	}
 	log.Println("SelectDemand Response:", resp)
 }
-
-
 
 // SubscribeSupply  Wrapper function for SMServiceClient
 func (clt *SMServiceClient) SubscribeSupply(ctx context.Context, spcb func(*SMServiceClient, *api.Supply)) {
@@ -306,9 +303,15 @@ func (clt *SMServiceClient) RegisterSupply(smo *SupplyOpts) uint64 {
 		ArgJson:    smo.JSON,
 	}
 
-	if(clt.MType == api.MarketType_RIDE_SHARE) {
+	switch clt.MType {
+	case api.MarketType_RIDE_SHARE:
 		sp := api.Supply_Arg_Fleet{
 			smo.Fleet,
+		}
+		dm.ArgOneof = &sp
+	case api.MarketType_PT_SERVICE:
+		sp := api.Supply_Arg_PTService{
+			smo.PTService,
 		}
 		dm.ArgOneof = &sp
 	}
@@ -317,14 +320,12 @@ func (clt *SMServiceClient) RegisterSupply(smo *SupplyOpts) uint64 {
 	defer cancel()
 	resp, err := clt.Client.RegisterSupply(ctx, &dm)
 	if err != nil {
-		log.Fatalf("%v.RegisterSupply err %v", clt, err)
+		log.Fatalf("Error for sending:RegisterSupply to  Synerex Server as %v", err)
 	}
 	log.Println("RegiterSupply:", smo, resp)
 	smo.ID = id // assign ID
 	return id
 }
-
-
 
 // Confirm sends confirm message to sender
 func (clt *SMServiceClient) Confirm(id IDType) {

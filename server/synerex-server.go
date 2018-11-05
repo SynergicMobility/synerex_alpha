@@ -1,10 +1,11 @@
 package main
 
-//go:generate protoc -I ../api --go_out=.. common/common.proto
-//go:generate protoc -I ../api --go_out=.. adservice/adservice.proto
-//go:generate protoc -I ../api  --go_out=.. fleet/fleet.proto
-//go:generate protoc -I ../api  --go_out=.. library/library.proto
-//go:generate protoc -I ../api  --go_out=.. rideshare/rideshare.proto
+//go:generate protoc -I ../api --go_out=paths=source_relative:../api common/common.proto
+//go:generate protoc -I ../api --go_out=paths=source_relative:../api adservice/adservice.proto
+//go:generate protoc -I ../api  --go_out=paths=source_relative:../api fleet/fleet.proto
+//go:generate protoc -I ../api  --go_out=paths=source_relative:../api library/library.proto
+//go:generate protoc -I ../api  --go_out=paths=source_relative:../api rideshare/rideshare.proto
+//go:generate protoc -I ../api  --go_out=paths=source_relative:../api ptransit/ptransit.proto
 
 //go:generate protoc -I ../api -I .. --go_out=plugins=grpc:../api smarket.proto
 
@@ -407,7 +408,7 @@ func main() {
 
 	monitorapi.InitMonitor(*monitor)
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *port))
+	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", *port))
 
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
